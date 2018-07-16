@@ -1,0 +1,381 @@
+#!/usr/bin/python3
+import sys
+a = sys.argv[1:]
+#a = "[neg (p or q)] seq [neg p]"
+#a = "[p imp q, (neg r) imp (neg q)] seq [p imp r]"
+#a = "[r] seq [p,neg q,s]"
+#a = "[p,neg q,r] seq [s]"
+#a = "[p] seq [a, b and c, d]"
+#a = "[a, b and c, d] seq [e]"
+#a = "[a] seq [b, c or d, e]"
+#a = "[a, b or c, d] seq [e]"
+#a = "[a] seq [b, c imp d, e]"
+#a = "[a] seq [b, c iff d, e]"
+#a = "[a, b iff c, d] seq [e]"
+#a = "[((neg d) and ((neg g) and (i and h))) and (e imp f), (a imp b) iff c, d iff (a imp c)] seq [a iff (c and h), neg d]"
+#a = "[] seq [(neg p) or p]"
+#a = "[neg(p or q)] seq [neg p]"
+#a = "[p] seq [q imp p]"
+#a = "[p] seq [q or p]"
+#a = "[(p and q) and r] seq [p and (q and r)]"
+#a='[p iff q] seq [neg (p iff (neg q))]'
+#a='[p iff q] seq [(q iff r) imp (p iff r)]'
+#a= '[] seq [((neg p) and (neg q)) imp [p iff q]]'
+#a='[p iff q] seq [(p and q) or ((neg p) and (neg q))]'
+#a='[p imp q, (neg r) imp (neg q)] seq [p imp r]'
+a = str(a[0])
+inference = []
+#a = str(sys.argv[1:])
+inference = a.split("seq")
+if inference[0] == "[] ":
+    
+    left_part = []
+else:
+    left_part = inference[0].split(",")
+    for i in range(len(left_part)):
+        left_part[i] = left_part[i].replace("[","")
+        left_part[i] = left_part[i].replace("]","")
+        left_part[i] = left_part[i].strip()  
+if inference[1] == " []":
+    right_part = []
+else:
+    right_part = inference[1].split(",")
+    for i in range(len(right_part)):
+        right_part[i] = right_part[i].replace("[","")
+        right_part[i] = right_part[i].replace("]","")
+        right_part[i] = right_part[i].strip() 
+#print(left_part)
+global_method = []
+global_path = []
+
+
+def get_operator(sequent):
+    current_state = 0
+    for i in range(len(sequent)):
+        if sequent[i] == "(":
+            current_state += 1
+        elif sequent[i] == ")":
+            current_state -= 1
+        else:
+            if current_state != 0:
+                continue
+            else:
+                if sequent[i:i+3] == "imp":
+                    return "imp",i
+                elif sequent[i:i+3] == "iff":
+                    return "iff",i
+                elif sequent[i:i+3] == "neg":
+                    return "neg",i
+                elif sequent[i:i+3] == "and":
+                    return "and",i
+                elif sequent[i:i+2] == "or":
+                    return "or",i
+                else:
+                    continue
+    return "", 0            
+def rules(input1,input2,Methods,Path):
+    valid = True
+    for i in input1:             #P1
+        if get_operator(i)[0] != "":
+            valid = False
+    for j in input2:
+        if get_operator(j)[0] != "":
+            valid = False
+    if valid == True:
+        for i in input1:
+            for j in input2:
+                if i == j:
+                    Methods.append("P1")
+                    Path.append(str(input1) + "seq" + str(input2))
+                    for y in range(len(Path)):
+                        if Path[y] not in global_path:
+                            global_path.append(Path[y])
+                            global_method.append(Methods[y])
+                    return True
+            
+    for i in input2:
+        if get_operator(i)[0] == "neg":     #P2a
+            #print("P2a")
+            temp_left = []
+            temp_right = []
+            index = get_operator(i)[1]
+            k = i[index+3:].strip()
+            if k[0] == "(" and k[-1] == ")":
+                k = k[1:-1]
+            for x in input1:
+                temp_left.append(x)
+            for y in input2:
+                if y != i:
+                    temp_right.append(y)
+            temp_left.append(k)
+            Methods.append("P2a")
+            Path.append(str(input1) + "seq" + str(input2))
+            #print(temp_left,temp_right)
+            return rules(temp_left,temp_right,Methods,Path)
+    
+    for i in input1:
+        if get_operator(i)[0] == "neg":     #P2b
+            #print("P2b")
+            temp_left = []
+            temp_right = []
+            index = get_operator(i)[1]
+            k = i[index+3:].strip()
+            if k[0] == "(" and k[-1] == ")":
+                k = k[1:-1]
+            for x in input2:
+                temp_right.append(x)
+            for y in input1:
+                if y != i:
+                    temp_left.append(y)
+            temp_right.append(k)
+            Methods.append("P2b")
+            Path.append(str(input1) + "seq" + str(input2))
+            #print(temp_left,temp_right)
+            return rules(temp_left,temp_right,Methods,Path)
+    
+    for i in input2:                #P3a
+        if get_operator(i)[0] == "and":
+            temp_left1 = []
+            temp_right1 = []
+            temp_left2 = []
+            temp_right2 = []
+            index = get_operator(i)[1]
+            k1 = i[:index].strip()
+            k2 = i[index+3:].strip()
+            if k1[0] == "(" and k1[index-2] == ")":
+                k1 = k1[1:index-2]
+            if k2[0] == "(" and k2[-1] == ")":
+                k2 = k2[1:-1]
+            for j in input1:
+                temp_left1.append(j)
+                temp_left2.append(j)
+            for x in input2:
+                if x != i:
+                    temp_right1.append(x)
+                    temp_right2.append(x)
+            temp_right1.append(k1)
+            temp_right2.append(k2)
+            Methods.append("P3a")
+            Path.append(str(input1) + "seq" + str(input2))
+            #print(k1)
+            #print(k2)
+            return rules(temp_left1,temp_right1,Methods,Path) and rules(temp_left2,temp_right2,Methods,Path)
+    
+    for i in input1:
+        if get_operator(i)[0] == "and":     #P3b
+            temp_left = []
+            temp_right = []
+            index = get_operator(i)[1]
+            k1 = i[:index].strip()
+            k2 = i[index+3:].strip()
+            if k1[0] == "(" and k1[index-2] == ")":
+                k1 = k1[1:index-2]
+            if k2[0] == "(" and k2[-1] == ")":
+                k2 = k2[1:-1]
+            for x in input2:
+                temp_right.append(x)
+            for y in input1:
+                if y != i:
+                    temp_left.append(y)
+            temp_left.append(k1)
+            temp_left.append(k2)
+            Methods.append("P3b")
+            Path.append(str(input1) + "seq" + str(input2))
+            return rules(temp_left,temp_right,Methods,Path)
+        
+    for i in input2:
+        if get_operator(i)[0] == "or":     #P4a
+            #print("P4a")
+            temp_left = []
+            temp_right = []
+            index = get_operator(i)[1]
+            k1 = i[:index].strip()
+            k2 = i[index+3:].strip()
+            if k1[0] == "(" and k1[index-2] == ")":
+                k1 = k1[1:index-2]
+            if k2[0] == "(" and k2[-1] == ")":
+                k2 = k2[1:-1]
+            for x in input1:
+                temp_left.append(x)
+            for y in input2:
+                if y != i:
+                    temp_right.append(y)
+            temp_right.append(k1)
+            temp_right.append(k2)
+            Methods.append("P4a")
+            Path.append(str(input1) + "seq" + str(input2))
+            return rules(temp_left,temp_right,Methods,Path)
+        
+    for i in input1:                #P4b
+        if get_operator(i)[0] == "or":
+            temp_left1 = []
+            temp_right1 = []
+            temp_left2 = []
+            temp_right2 = []
+            index = get_operator(i)[1]
+            k1 = i[:index].strip()
+            k2 = i[index+3:].strip()
+            if k1[0] == "(" and k1[index-2] == ")":
+                k1 = k1[1:index-2]
+            if k2[0] == "(" and k2[-1] == ")":
+                k2 = k2[1:-1]
+            for j in input2:
+                temp_right1.append(j)
+                temp_right2.append(j)
+            for x in input1:
+                if x != i:
+                    temp_left1.append(x)
+                    temp_left2.append(x)
+            temp_left1.append(k1)
+            temp_left2.append(k2)
+            Methods.append("P4b")
+            Path.append(str(input1) + "seq" + str(input2))
+            #print(k1)
+            #print(k2)
+            return rules(temp_left1,temp_right1,Methods,Path) and rules(temp_left2,temp_right2,Methods,Path)    
+    
+    for i in input2:
+        if get_operator(i)[0] == "imp":     #P5a
+            temp_left = []
+            temp_right = []
+            index = get_operator(i)[1]
+            k1 = i[:index].strip()
+            k2 = i[index+3:].strip()
+            if k1[0] == "(" and k1[index-2] == ")":
+                k1 = k1[1:index-2]
+            if k2[0] == "(" and k2[-1] == ")":
+                k2 = k2[1:-1]
+            for x in input1:
+                temp_left.append(x)
+            for y in input2:
+                if y != i:
+                    temp_right.append(y)
+            temp_left.append(k1)
+            temp_right.append(k2)
+            Methods.append("P5a")
+            Path.append(str(input1) + "seq" + str(input2))
+            return rules(temp_left,temp_right,Methods,Path)
+    
+    for i in input1:              #P5b
+        if get_operator(i)[0] == "imp":
+            temp_left1 = []
+            temp_right1 = []
+            temp_left2 = []
+            temp_right2 = []
+            index = get_operator(i)[1]
+            k1 = i[:index].strip()
+            k2 = i[index+3:].strip()
+            if k1[0] == "(" and k1[index-2] == ")":
+                k1 = k1[1:index-2]
+            if k2[0] == "(" and k2[-1] == ")":
+                k2 = k2[1:-1]
+            for j in input2:
+                temp_right1.append(j)
+                temp_right2.append(j)
+            for x in input1:
+                if x != i:
+                    temp_left1.append(x)
+                    temp_left2.append(x)
+            temp_left1.append(k2)
+            temp_right2.append(k1)
+            Methods.append("P5b")
+            Path.append(str(input1) + "seq" + str(input2))
+            #print(k1)
+            #print(k2)
+            return rules(temp_left1,temp_right1,Methods,Path) and rules(temp_left2,temp_right2,Methods,Path)
+        
+    for i in input2:              #P6a
+        if get_operator(i)[0] == "iff":
+            temp_left1 = []
+            temp_right1 = []
+            temp_left2 = []
+            temp_right2 = []
+            index = get_operator(i)[1]
+            k1 = i[:index].strip()
+            k2 = i[index+3:].strip()
+            for j in input1:
+                temp_left1.append(j)
+                temp_left2.append(j)
+            for x in input2:
+                if x != i:
+                    temp_right1.append(x)
+                    temp_right2.append(x)
+            if k1[0] == "(" and k1[index-2] == ")":
+                k1 = k1[1:index-2]
+            if k2[0] == "(" and k2[-1] == ")":
+                k2 = k2[1:-1]
+            temp_left1.append(k1)
+            temp_right1.append(k2)
+            temp_left2.append(k2)
+            temp_right2.append(k1)
+            Methods.append("P6a")
+            Path.append(str(input1) + "seq" + str(input2))
+            #print(k1)
+            #print(k2)
+            return rules(temp_left1,temp_right1,Methods,Path) and rules(temp_left2,temp_right2,Methods,Path)
+        
+    for i in input1:              #P6a
+        if get_operator(i)[0] == "iff":
+            temp_left1 = []
+            temp_right1 = []
+            temp_left2 = []
+            temp_right2 = []
+            index = get_operator(i)[1]
+            k1 = i[:index].strip()
+            k2 = i[index+3:].strip()
+            if k1[0] == "(" and k1[index-2] == ")":
+                k1 = k1[1:index-2]
+            if k2[0] == "(" and k2[-1] == ")":
+                k2 = k2[1:-1]
+            for j in input2:
+                temp_right1.append(j)
+                temp_right2.append(j)
+            for x in input1:
+                if x != i:
+                    temp_left1.append(x)
+                    temp_left2.append(x)
+            temp_left1.append(k1)
+            temp_left1.append(k2)
+            temp_right2.append(k2)
+            temp_right2.append(k1)
+            Methods.append("P6b")
+            Path.append(str(input1) + "seq" + str(input2))
+            #print(k1)
+            #print(k2)
+            return rules(temp_left1,temp_right1,Methods,Path) and rules(temp_left2,temp_right2,Methods,Path)
+    
+    return False       
+if rules(left_part,right_part,[],[]) == True:
+    for i in range(len(global_path)):
+        global_path[i] = str(global_path[i]).replace("'","")
+    print("True")
+    for i in range(len(global_method)-1,-1,-1):
+        for j in range(len(global_path)-1,-1,-1):
+            if i == j:
+                #print(str(len(global_method) - i) + ". " +global_path[i] + "   " + global_method[i])
+                print("{0:2}.".format(str(len(global_method) - i)) + "{0:60}".format(global_path[i]) + global_method[i])
+    print("QED.")  
+    #print(global_method.count("P1"))
+else:
+    print(rules(left_part,right_part,[],[]))
+    
+
+ 
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+                                               
